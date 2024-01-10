@@ -1,3 +1,7 @@
+Differences of this fork:
+Ctrl+Up and Ctrl+Down bindings can show you multiline help for selected item:
+[multiline_help.webm](https://github.com/2lx/replxx/assets/1208782/6652f968-9bcb-46e3-80a2-cd835786592d)
+
 # Read Evaluate Print Loop ++
 
 ![demo](https://codestation.org/download/replxx.gif)
