@@ -129,6 +129,7 @@ private:
 	bool _bracketedPaste;
 	bool _noColor;
 	bool _indentMultiline;
+	bool _withHelp;
 	named_actions_t _namedActions;
 	key_press_handlers_t _keyPressHandlers;
 	Terminal _terminal;
@@ -138,6 +139,7 @@ private:
 	Replxx::completion_callback_t _completionCallback;
 	Replxx::highlighter_callback_t _highlighterCallback;
 	Replxx::hint_callback_t _hintCallback;
+	Replxx::hint_with_help_callback_t _helpCallback;
 	key_presses_t _keyPresses;
 	messages_t _messages;
 	std::string _asyncPrompt;
@@ -151,6 +153,7 @@ private:
 	bool _modifiedState;
 	Replxx::Color _hintColor;
 	hints_t _hintsCache;
+	hints_t _helpsCache;
 	int _hintContextLenght;
 	Utf8String _hintSeed;
 	bool _hasNewlines;
@@ -161,10 +164,12 @@ private:
 public:
 	ReplxxImpl( FILE*, FILE*, FILE* );
 	virtual ~ReplxxImpl( void );
+	bool hasHintCallback() const { return _withHelp ? !!_helpCallback : !!_hintCallback; }
 	void set_modify_callback( Replxx::modify_callback_t const& fn );
 	void set_completion_callback( Replxx::completion_callback_t const& fn );
 	void set_highlighter_callback( Replxx::highlighter_callback_t const& fn );
 	void set_hint_callback( Replxx::hint_callback_t const& fn );
+	void set_hint_with_help_callback( Replxx::hint_with_help_callback_t const& fn );
 	char const* input( std::string const& prompt );
 	void history_add( std::string const& line );
 	bool history_sync( std::string const& filename );
@@ -187,6 +192,7 @@ public:
 	void set_unique_history( bool );
 	void set_no_color( bool val );
 	void set_indent_multiline( bool val );
+	void set_with_help( bool val );
 	void set_max_history_size( int len );
 	void set_completion_count_cutoff( int len );
 	int install_window_change_handler( void );
@@ -254,6 +260,9 @@ private:
 	Replxx::ACTION_RESULT hint_next( char32_t );
 	Replxx::ACTION_RESULT hint_previous( char32_t );
 	Replxx::ACTION_RESULT hint_move( bool );
+	Replxx::ACTION_RESULT hint_next_with_help( char32_t );
+	Replxx::ACTION_RESULT hint_previous_with_help( char32_t );
+	Replxx::ACTION_RESULT hint_move_with_help( bool );
 	Replxx::ACTION_RESULT toggle_overwrite_mode( char32_t );
 #ifndef _WIN32
 	Replxx::ACTION_RESULT verbatim_insert( char32_t );
@@ -272,6 +281,7 @@ private:
 	void call_modify_callback( void );
 	completions_t call_completer( std::string const& input, int& ) const;
 	hints_t call_hinter( std::string const& input, int&, Replxx::Color& color ) const;
+	std::pair<hints_t, hints_t> call_hinter_with_help( std::string const& input, int&, Replxx::Color& color ) const;
 	void refresh_line( HINT_ACTION = HINT_ACTION::REGENERATE );
 	void move_cursor( void );
 	void indent( void );

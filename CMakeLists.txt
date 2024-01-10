@@ -168,7 +168,14 @@ install(
 if (REPLXX_BUILD_EXAMPLES)
 	add_executable(replxx-example-cxx-api "")
 	add_executable(replxx-example-c-api "")
+	add_executable(mytest "")
 
+	target_sources(
+		mytest
+		PRIVATE
+			examples/mytest.cxx
+			examples/util.c
+	)
 	target_sources(
 		replxx-example-cxx-api
 		PRIVATE
@@ -181,10 +188,13 @@ if (REPLXX_BUILD_EXAMPLES)
 			examples/c-api.c
 			examples/util.c
 	)
+	target_compile_definitions(mytest PRIVATE REPLXX_STATIC $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS=1>)
 	target_compile_definitions(replxx-example-cxx-api PRIVATE REPLXX_STATIC $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS=1>)
 	target_compile_definitions(replxx-example-c-api PRIVATE REPLXX_STATIC $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS=1>)
+	target_link_options(mytest PRIVATE $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:GNU>>:-g -ggdb -g3 -ggdb3>)
 	target_link_options(replxx-example-cxx-api PRIVATE $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:GNU>>:-g -ggdb -g3 -ggdb3>)
 	target_link_options(replxx-example-c-api PRIVATE $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:GNU>>:-g -ggdb -g3 -ggdb3>)
+	target_link_libraries(mytest PRIVATE replxx::replxx)
 	target_link_libraries(replxx-example-cxx-api PRIVATE replxx::replxx)
 	target_link_libraries(
 		replxx-example-c-api

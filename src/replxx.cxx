@@ -146,6 +146,10 @@ void Replxx::set_hint_callback( hint_callback_t const& fn ) {
 	_impl->set_hint_callback( fn );
 }
 
+void Replxx::set_hint_with_help_callback( hint_with_help_callback_t const& fn ) {
+	_impl->set_hint_with_help_callback( fn );
+}
+
 char const* Replxx::input( std::string const& prompt ) {
 	return ( _impl->input( prompt ) );
 }
@@ -232,6 +236,10 @@ void Replxx::set_no_color( bool val ) {
 
 void Replxx::set_indent_multiline( bool val ) {
 	_impl->set_indent_multiline( val );
+}
+
+void Replxx::set_with_help( bool val ) {
+	_impl->set_with_help( val );
 }
 
 void Replxx::set_max_history_size( int len ) {

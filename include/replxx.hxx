@@ -189,6 +189,8 @@ public:
 		HISTORY_COMMON_PREFIX_SEARCH,
 		HINT_NEXT,
 		HINT_PREVIOUS,
+		HINT_NEXT_WITH_HELP,
+		HINT_PREVIOUS_WITH_HELP,
 		CAPITALIZE_WORD,
 		LOWERCASE_WORD,
 		UPPERCASE_WORD,
@@ -353,6 +355,7 @@ public:
 	 * \return A list of possible hints.
 	 */
 	typedef std::function<hints_t ( std::string const& input, int& contextLen, Color& color )> hint_callback_t;
+	typedef std::function<std::pair<hints_t, hints_t> ( std::string const& input, int& contextLen, Color& color )> hint_with_help_callback_t;
 
 	/*! \brief Key press handler type definition.
 	 *
@@ -418,6 +421,12 @@ public:
 	 * \param fn - user defined callback function.
 	 */
 	void set_hint_callback( hint_callback_t const& fn );
+
+	/*! \brief Register hints with help callback.
+	 *
+	 * \param fn - user defined callback function.
+	 */
+	void set_hint_with_help_callback( hint_with_help_callback_t const& fn );
 
 	/*! \brief Read line of user input.
 	 *
@@ -635,6 +644,7 @@ public:
 	 * \param val - if set to true then multiline indent will be enabled.
 	 */
 	void set_indent_multiline( bool val );
+	void set_with_help(bool val);
 
 	/*! \brief Set maximum number of entries in history list.
 	 */

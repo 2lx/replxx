@@ -174,6 +174,8 @@ typedef enum {
 	REPLXX_ACTION_HISTORY_COMMON_PREFIX_SEARCH,
 	REPLXX_ACTION_HINT_NEXT,
 	REPLXX_ACTION_HINT_PREVIOUS,
+	REPLXX_ACTION_HINT_NEXT_WITH_HELP,
+	REPLXX_ACTION_HINT_PREVIOUS_WITH_HELP,
 	REPLXX_ACTION_CAPITALIZE_WORD,
 	REPLXX_ACTION_LOWERCASE_WORD,
 	REPLXX_ACTION_UPPERCASE_WORD,
@@ -536,6 +538,7 @@ REPLXX_IMPEXP void replxx_set_no_color( Replxx*, int val );
  * \param val - if set to non-zero then multiline indent will be enabled.
  */
 REPLXX_IMPEXP void replxx_set_indent_multiline( Replxx*, int val );
+REPLXX_IMPEXP void replxx_set_with_help( Replxx*, int val );
 
 /*! \brief Set maximum number of entries in history list.
  */

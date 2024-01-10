@@ -90,6 +90,8 @@ char const HISTORY_RESTORE[]                   = "history_restore";
 char const HISTORY_RESTORE_CURRENT[]           = "history_restore_current";
 char const HINT_PREVIOUS[]                     = "hint_previous";
 char const HINT_NEXT[]                         = "hint_next";
+char const HINT_PREVIOUS_WITH_HELP[]           = "hint_previous_with_help";
+char const HINT_NEXT_WITH_HELP[]               = "hint_next_with_help";
 char const VERBATIM_INSERT[]                   = "verbatim_insert";
 char const SUSPEND[]                           = "suspend";
 char const COMPLETE_LINE[]                     = "complete_line";
@@ -173,6 +175,7 @@ Replxx::ReplxxImpl::ReplxxImpl( FILE*, FILE*, FILE* )
 	, _bracketedPaste( false )
 	, _noColor( false )
 	, _indentMultiline( true )
+	, _withHelp(false)
 	, _namedActions()
 	, _keyPressHandlers()
 	, _terminal()
@@ -181,6 +184,7 @@ Replxx::ReplxxImpl::ReplxxImpl( FILE*, FILE*, FILE* )
 	, _completionCallback( nullptr )
 	, _highlighterCallback( nullptr )
 	, _hintCallback( nullptr )
+	, _helpCallback( nullptr )
 	, _keyPresses()
 	, _messages()
 	, _asyncPrompt()
@@ -248,6 +252,8 @@ Replxx::ReplxxImpl::ReplxxImpl( FILE*, FILE*, FILE* )
 	_namedActions[action_names::HISTORY_RESTORE_CURRENT]           = std::bind( &ReplxxImpl::invoke, this, Replxx::ACTION::HISTORY_RESTORE_CURRENT,           _1 );
 	_namedActions[action_names::HINT_PREVIOUS]                     = std::bind( &ReplxxImpl::invoke, this, Replxx::ACTION::HINT_PREVIOUS,                     _1 );
 	_namedActions[action_names::HINT_NEXT]                         = std::bind( &ReplxxImpl::invoke, this, Replxx::ACTION::HINT_NEXT,                         _1 );
+	_namedActions[action_names::HINT_PREVIOUS_WITH_HELP]           = std::bind( &ReplxxImpl::invoke, this, Replxx::ACTION::HINT_PREVIOUS_WITH_HELP,           _1 );
+	_namedActions[action_names::HINT_NEXT_WITH_HELP]               = std::bind( &ReplxxImpl::invoke, this, Replxx::ACTION::HINT_NEXT_WITH_HELP,               _1 );
 #ifndef _WIN32
 	_namedActions[action_names::VERBATIM_INSERT]                   = std::bind( &ReplxxImpl::invoke, this, Replxx::ACTION::VERBATIM_INSERT,                   _1 );
 	_namedActions[action_names::SUSPEND]                           = std::bind( &ReplxxImpl::invoke, this, Replxx::ACTION::SUSPEND,                           _1 );
@@ -374,6 +380,8 @@ Replxx::ACTION_RESULT Replxx::ReplxxImpl::invoke( Replxx::ACTION action_, char32
 		case ( Replxx::ACTION::HISTORY_COMMON_PREFIX_SEARCH ):      return ( action( RESET_KILL_ACTION | DONT_RESET_PREFIX, &Replxx::ReplxxImpl::common_prefix_search, code ) );
 		case ( Replxx::ACTION::HINT_NEXT ):                         return ( action( NOOP, &Replxx::ReplxxImpl::hint_next, code ) );
 		case ( Replxx::ACTION::HINT_PREVIOUS ):                     return ( action( NOOP, &Replxx::ReplxxImpl::hint_previous, code ) );
+		case ( Replxx::ACTION::HINT_NEXT_WITH_HELP ):               return ( action( NOOP, &Replxx::ReplxxImpl::hint_next_with_help, code ) );
+		case ( Replxx::ACTION::HINT_PREVIOUS_WITH_HELP ):           return ( action( NOOP, &Replxx::ReplxxImpl::hint_previous_with_help, code ) );
 		case ( Replxx::ACTION::CAPITALIZE_WORD ):                   return ( action( RESET_KILL_ACTION | HISTORY_RECALL_MOST_RECENT, &Replxx::ReplxxImpl::capitalize_word<false>, code ) );
 		case ( Replxx::ACTION::LOWERCASE_WORD ):                    return ( action( RESET_KILL_ACTION | HISTORY_RECALL_MOST_RECENT, &Replxx::ReplxxImpl::lowercase_word<false>, code ) );
 		case ( Replxx::ACTION::UPPERCASE_WORD ):                    return ( action( RESET_KILL_ACTION | HISTORY_RECALL_MOST_RECENT, &Replxx::ReplxxImpl::uppercase_word<false>, code ) );
@@ -553,6 +561,29 @@ Replxx::ReplxxImpl::hints_t Replxx::ReplxxImpl::call_hinter( std::string const& 
 		hints.emplace_back( h.c_str() );
 	}
 	return ( hints );
+}
+
+std::pair<Replxx::ReplxxImpl::hints_t, Replxx::ReplxxImpl::hints_t>
+Replxx::ReplxxImpl::call_hinter_with_help( std::string const& input, int& contextLen, Replxx::Color& color ) const
+{
+	Replxx::hints_t hintsIntermediary, helpsIntermediary;
+	std::tie(hintsIntermediary, helpsIntermediary) =
+		!! _helpCallback
+			? _helpCallback(input, contextLen, color )
+			: std::make_pair<Replxx::hints_t, Replxx::hints_t>({}, {});
+
+	hints_t hints;
+	hints.reserve( hintsIntermediary.size() );
+	for ( std::string const& h : hintsIntermediary ) {
+		hints.emplace_back( h.c_str() );
+	}
+
+	hints_t helps;
+	helps.reserve( helpsIntermediary.size() );
+	for ( std::string const& h : helpsIntermediary ) {
+		helps.emplace_back( h.c_str() );
+	}
+	return std::make_pair(std::move(hints), std::move(helps));
 }
 
 void Replxx::ReplxxImpl::set_preload_buffer( std::string const& preloadText ) {
@@ -819,7 +850,7 @@ void Replxx::ReplxxImpl::handle_hints( HINT_ACTION hintAction_ ) {
 	if ( _noColor ) {
 		return;
 	}
-	if ( ! _hintCallback ) {
+	if ( ! hasHintCallback() ) {
 		return;
 	}
 	if ( ( _hintDelay > 0 ) && ( hintAction_ != HINT_ACTION::REPAINT ) ) {
@@ -842,7 +873,10 @@ void Replxx::ReplxxImpl::handle_hints( HINT_ACTION hintAction_ ) {
 		_hintContextLenght = context_length();
 		_hintColor = Replxx::Color::GRAY;
 		IOModeGuard ioModeGuard( _terminal );
-		_hintsCache = call_hinter( _utf8Buffer.get(), _hintContextLenght, _hintColor );
+		if (_withHelp)
+			std::tie(_hintsCache, _helpsCache) = call_hinter_with_help( _utf8Buffer.get(), _hintContextLenght, _hintColor );
+		else
+			_hintsCache = call_hinter( _utf8Buffer.get(), _hintContextLenght, _hintColor );
 	}
 	int hintCount( static_cast<int>( _hintsCache.size() ) );
 	if ( hintCount == 1 ) {
@@ -879,6 +913,24 @@ void Replxx::ReplxxImpl::handle_hints( HINT_ACTION hintAction_ ) {
 			}
 		}
 		startCol -= _hintContextLenght;
+		if (_withHelp && _hintSelection != -1 && _hintSelection < _helpsCache.size())
+		{
+#ifdef _WIN32
+				_display.push_back( '\r' );
+#endif
+				_display.push_back( '\n' );
+				int col( 0 );
+				for ( int i( 0 ); ( i < startCol ) && ( col < maxCol ); ++ i, ++ col ) {
+					_display.push_back( ' ' );
+				}
+				set_color( _hintColor );
+				UnicodeString const& h( _helpsCache[_hintSelection] );
+				for ( int i( 0 ); ( i < h.length() ) && ( col < maxCol ); ++ i, ++ col ) {
+					_display.push_back( h[i] );
+				}
+				set_color( Replxx::Color::DEFAULT );
+		}
+		else
 		for ( int hintRow( 0 ); hintRow < min( hintCount, _maxHintRows ); ++ hintRow ) {
 #ifdef _WIN32
 			_display.push_back( '\r' );
@@ -1472,7 +1524,7 @@ Replxx::ACTION_RESULT Replxx::ReplxxImpl::insert_character( char32_t c ) {
 	if (
 		( _pos == _data.length() )
 		&& ! _modifiedState
-		&& ( _noColor || ! ( !! _highlighterCallback || !! _hintCallback ) )
+		&& ( _noColor || ! ( !! _highlighterCallback || hasHintCallback() ) )
 		&& ( yCursorPos == 0 )
 	) {
 		/* Avoid a full assign of the line in the
@@ -2053,6 +2105,29 @@ Replxx::ACTION_RESULT Replxx::ReplxxImpl::hint_move( bool previous_ ) {
 	return ( Replxx::ACTION_RESULT::CONTINUE );
 }
 
+Replxx::ACTION_RESULT Replxx::ReplxxImpl::hint_next_with_help(char32_t)
+{
+	return hint_move_with_help(false);
+}
+
+Replxx::ACTION_RESULT Replxx::ReplxxImpl::hint_previous_with_help(char32_t)
+{
+	return hint_move_with_help(true);
+}
+
+Replxx::ACTION_RESULT Replxx::ReplxxImpl::hint_move_with_help( bool previous_ ) {
+	if ( ! _noColor ) {
+		_killRing.lastAction = KillRing::actionOther;
+		if ( previous_ ) {
+			-- _hintSelection;
+		} else {
+			++ _hintSelection;
+		}
+		refresh_line( HINT_ACTION::REPAINT );
+	}
+	return ( Replxx::ACTION_RESULT::CONTINUE );
+}
+
 Replxx::ACTION_RESULT Replxx::ReplxxImpl::toggle_overwrite_mode( char32_t ) {
 	_overwrite = ! _overwrite;
 	return ( Replxx::ACTION_RESULT::CONTINUE );
@@ -2475,6 +2550,10 @@ void Replxx::ReplxxImpl::set_hint_callback( Replxx::hint_callback_t const& fn ) 
 	_hintCallback = fn;
 }
 
+void Replxx::ReplxxImpl::set_hint_with_help_callback( Replxx::hint_with_help_callback_t const& fn ) {
+	_helpCallback = fn;
+}
+
 void Replxx::ReplxxImpl::set_max_history_size( int len ) {
 	_history.set_max_size( len );
 }
@@ -2525,6 +2604,10 @@ void Replxx::ReplxxImpl::set_no_color( bool val ) {
 
 void Replxx::ReplxxImpl::set_indent_multiline( bool val ) {
 	_indentMultiline = val;
+}
+
+void Replxx::ReplxxImpl::set_with_help(bool val) {
+	_withHelp = val;
 }
 
 /**
