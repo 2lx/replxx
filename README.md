@@ -1,6 +1,7 @@
 Differences of this fork:
 * Ctrl+Up and Ctrl+Down bindings can show you multiline help for selected item.
 * show the multiline help when only the last hint remains
+
 Example:
 [hint_with_help.webm](https://github.com/2lx/replxx/assets/1208782/4c6804fa-ce0f-4a4f-aca3-da5ad48bf8d8)
 
