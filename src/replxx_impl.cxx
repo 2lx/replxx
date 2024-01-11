@@ -879,6 +879,32 @@ void Replxx::ReplxxImpl::handle_hints( HINT_ACTION hintAction_ ) {
 			_hintsCache = call_hinter( _utf8Buffer.get(), _hintContextLenght, _hintColor );
 	}
 	int hintCount( static_cast<int>( _hintsCache.size() ) );
+	int maxCol( _prompt.screen_columns() );
+#ifdef _WIN32
+	-- maxCol;
+#endif
+	auto fn_print_help = [&](int idx)
+	{
+		if (idx >= _helpsCache.size())
+			return;
+
+#ifdef _WIN32
+		_display.push_back('\r');
+#endif
+		_display.push_back('\n');
+		set_color(Replxx::Color::DEFAULT);
+		UnicodeString const& h(_helpsCache[idx]);
+		for (int i = 0, col = 0; i < h.length(); ++ i, ++ col)
+		{
+			if (col >= maxCol)
+				while(h[i] != '\n')
+					++i;
+
+			_display.push_back(h[i]);
+			if (h[i] == '\n')
+				col = 0;
+		}
+	};
 	if ( hintCount == 1 ) {
 		_hint = _hintsCache.front();
 		int len( _hint.length() - _hintContextLenght );
@@ -889,13 +915,11 @@ void Replxx::ReplxxImpl::handle_hints( HINT_ACTION hintAction_ ) {
 			}
 			set_color( Replxx::Color::DEFAULT );
 		}
+		if (_withHelp)
+			fn_print_help(0);
 	} else if ( ( _maxHintRows > 0 ) && ( hintCount > 0 ) ) {
 		int posInLine( pos_in_line() );
 		int startCol( ( _indentMultiline || ( posInLine == _pos ) ? _prompt.indentation() : 0 ) + posInLine );
-		int maxCol( _prompt.screen_columns() );
-#ifdef _WIN32
-		-- maxCol;
-#endif
 		if ( _hintSelection < -1 ) {
 			_hintSelection = hintCount - 1;
 		} else if ( _hintSelection >= hintCount ) {
@@ -913,23 +937,8 @@ void Replxx::ReplxxImpl::handle_hints( HINT_ACTION hintAction_ ) {
 			}
 		}
 		startCol -= _hintContextLenght;
-		if (_withHelp && _hintSelection != -1 && _hintSelection < _helpsCache.size())
-		{
-#ifdef _WIN32
-				_display.push_back( '\r' );
-#endif
-				_display.push_back( '\n' );
-				int col( 0 );
-				for ( int i( 0 ); ( i < startCol ) && ( col < maxCol ); ++ i, ++ col ) {
-					_display.push_back( ' ' );
-				}
-				set_color( _hintColor );
-				UnicodeString const& h( _helpsCache[_hintSelection] );
-				for ( int i( 0 ); ( i < h.length() ) && ( col < maxCol ); ++ i, ++ col ) {
-					_display.push_back( h[i] );
-				}
-				set_color( Replxx::Color::DEFAULT );
-		}
+		if (_withHelp && _hintSelection != -1 && _hintSelection < _helpsCache.size() && !_helpsCache[_hintSelection].is_empty())
+			fn_print_help(_hintSelection);
 		else
 		for ( int hintRow( 0 ); hintRow < min( hintCount, _maxHintRows ); ++ hintRow ) {
 #ifdef _WIN32
